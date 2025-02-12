@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Blocky Bird</title>
+    <style>
+      .control-section {
+        margin: 10px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+      .slider-container {
+        margin: 5px 0;
+      }
+      label {
+        display: inline-block;
+        width: 120px;
+      }
+    </style>
+  </head>
+
+  <body onload="main()">
+    <canvas id="webgl" width="500" height="500">
+      Please use a browser that supports "canvas"
+    </canvas>
+
+    <div class="control-section">
+      <h3>Wing Controls</h3>
+      <div class="slider-container">
+        <label>Wing Flap:</label>
+        <input type="range" min="-45" max="45" value="0" class="slider" id="wingFlapSlider">
+      </div>
+    </div>
+
+    <div class="control-section">
+      <h3>Left Leg Controls</h3>
+      <div class="slider-container">
+        <label>Upper Leg:</label>
+        <input type="range" min="-45" max="45" value="0" class="slider" id="leftUpperLegSlider">
+      </div>
+      <div class="slider-container">
+        <label>Lower Leg:</label>
+        <input type="range" min="-45" max="45" value="0" class="slider" id="leftLowerLegSlider">
+      </div>
+      <div class="slider-container">
+        <label>Foot:</label>
+        <input type="range" min="-45" max="45" value="0" class="slider" id="leftFootSlider">
+      </div>
+    </div>
+
+    <div class="control-section">
+      <h3>Right Leg Controls</h3>
+      <div class="slider-container">
+        <label>Upper Leg:</label>
+        <input type="range" min="-45" max="45" value="0" class="slider" id="rightUpperLegSlider">
+      </div>
+      <div class="slider-container">
+        <label>Lower Leg:</label>
+        <input type="range" min="-45" max="45" value="0" class="slider" id="rightLowerLegSlider">
+      </div>
+      <div class="slider-container">
+        <label>Foot:</label>
+        <input type="range" min="-45" max="45" value="0" class="slider" id="rightFootSlider">
+      </div>
+    </div>
+
+    <div class="control-section">
+      <h3>Head & Tail Controls</h3>
+      <div class="slider-container">
+        <label>Neck:</label>
+        <input type="range" min="-45" max="45" value="0" class="slider" id="neckSlider">
+      </div>
+      <div class="slider-container">
+        <label>Tail:</label>
+        <input type="range" min="-45" max="45" value="0" class="slider" id="tailSlider">
+      </div>
+    </div>
+
+    <div class="control-section">
+      <h3>Animation Controls</h3>
+      <button type="button" id="animationButton">Toggle Animation</button>
+      <p>Shift + Click to trigger special animation</p>
+      <p>Click and drag to rotate view</p>
+    </div>
+
+    <div class="control-section">
+      <p id="fps">FPS: </p>
+    </div>
+
+    <script src="lib/webgl-utils.js"></script>
+    <script src="lib/webgl-debug.js"></script>
+    <script src="lib/cuon-utils.js"></script>
+    <script src="lib/cuon-matrix.js"></script>
+    <script src="Triangle.js"></script>
+    <script src="Cube.js"></script>
+    <script src="Cone.js"></script>
+    <script src="Blocky_Animal.js"></script>
+  </body>
+</html>
