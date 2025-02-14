@@ -43,6 +43,7 @@ var FSHADER_SOURCE = `
     }`;
 
 // Global Variables
+let g_fpsCounter;
 let canvas;
 let gl;
 let a_Position;
@@ -205,16 +206,70 @@ function connectVariablesToGLSL() {
     
     // Get uniform locations
     u_FragColor = gl.getUniformLocation(gl.program, 'u_FragColor');
+    if (!u_FragColor) {
+        console.log('Failed to get the storage location of u_FragColor');
+        return;
+    }
+
     u_ModelMatrix = gl.getUniformLocation(gl.program, 'u_ModelMatrix');
+    if (!u_ModelMatrix) {
+        console.log('Failed to get the storage location of u_ModelMatrix');
+        return;
+    }
+
     u_GlobalRotateMatrix = gl.getUniformLocation(gl.program, 'u_GlobalRotateMatrix');
+    if (!u_GlobalRotateMatrix) {
+        console.log('Failed to get the storage location of u_GlobalRotateMatrix');
+        return;
+    }
+
     u_ViewMatrix = gl.getUniformLocation(gl.program, 'u_ViewMatrix');
+    if (!u_ViewMatrix) {
+        console.log('Failed to get the storage location of u_ViewMatrix');
+        return;
+    }
+
     u_ProjectionMatrix = gl.getUniformLocation(gl.program, 'u_ProjectionMatrix');
+    if (!u_ProjectionMatrix) {
+        console.log('Failed to get the storage location of u_ProjectionMatrix');
+        return;
+    }
+
     u_Sampler0 = gl.getUniformLocation(gl.program, 'u_Sampler0');
+    if (!u_Sampler0) {
+        console.log('Failed to get the storage location of u_Sampler0');
+        return;
+    }
+
     u_Sampler1 = gl.getUniformLocation(gl.program, 'u_Sampler1');
+    if (!u_Sampler1) {
+        console.log('Failed to get the storage location of u_Sampler1');
+        return;
+    }
+
     u_Sampler2 = gl.getUniformLocation(gl.program, 'u_Sampler2');
+    if (!u_Sampler2) {
+        console.log('Failed to get the storage location of u_Sampler2');
+        return;
+    }
+
     u_Sampler3 = gl.getUniformLocation(gl.program, 'u_Sampler3');
+    if (!u_Sampler3) {
+        console.log('Failed to get the storage location of u_Sampler3');
+        return;
+    }
+
     u_Sampler4 = gl.getUniformLocation(gl.program, 'u_Sampler4');
+    if (!u_Sampler4) {
+        console.log('Failed to get the storage location of u_Sampler4');
+        return;
+    }
+
     u_whichTexture = gl.getUniformLocation(gl.program, 'u_whichTexture');
+    if (!u_whichTexture) {
+        console.log('Failed to get the storage location of u_whichTexture');
+        return;
+    }
 
     // Check for errors
     if (!u_FragColor || !u_ModelMatrix || !u_GlobalRotateMatrix || !u_ViewMatrix || 
@@ -296,7 +351,7 @@ function sendImageToTexture(image, texNum) {
 }
 
 function drawMap() {
-    // Use identity matrix for pre-transformed geometry
+    // identity matrix
     const identityMat = new Matrix4();
     gl.uniformMatrix4fv(u_ModelMatrix, false, identityMat.elements);
 
@@ -374,7 +429,6 @@ function onMouseMove(e) {
 }
 
 function renderAllShapes() {
-    let startTime = performance.now();
     console.log('Starting render cycle...');
     console.log('Camera position:', {
         eye: g_camera.eye.elements,
@@ -384,12 +438,12 @@ function renderAllShapes() {
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    // Set up projection matrix
+    // projection matrix
     let projMat = new Matrix4();
     projMat.setPerspective(60, canvas.width/canvas.height, 0.1, 100);
     gl.uniformMatrix4fv(u_ProjectionMatrix, false, projMat.elements);
 
-    // Set up view matrix
+    // view matrix
     let viewMat = new Matrix4();
     viewMat.setLookAt(
         g_camera.eye.elements[0], g_camera.eye.elements[1], g_camera.eye.elements[2],
@@ -409,8 +463,7 @@ function renderAllShapes() {
 
     g_treeSystem.render(gl, a_Position, a_UV, u_whichTexture);
 
-    let duration = performance.now() - startTime;
-    console.log(`Render cycle completed in ${duration}ms`);
+    updateFPS();
 }
 
 function tick() {
@@ -455,23 +508,36 @@ function initMouseControls() {
 }
 
 function main() {
+    g_fpsCounter = new FPSCounter();
     setupWebGL();
     connectVariablesToGLSL();
     initTextures();
     initializeMap();    // Must come before setupBuffers
-    setupBuffers();     // New buffer initialization
+    setupBuffers();
 
     g_treeSystem = new TreeSystem();
     g_treeSystem.generateTrees(g_map);
     g_treeSystem.setupBuffers(gl);
     
-    g_blockSystem = new BlockSystem(g_map);  // Initialize block system
+    g_blockSystem = new BlockSystem(g_map);
     g_camera = new Camera();
 
-    initMouseControls(); // Initialize mouse controls
+    initMouseControls();
     document.onkeydown = keydown;
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     requestAnimationFrame(tick);
+}
+
+function updateFPS() {
+    if (!g_fpsCounter) {
+        console.error('FPS Counter not initialized');
+        return;
+    }
+    const fps = g_fpsCounter.tick();
+    const fpsDisplay = document.getElementById('numdot');
+    if (fpsDisplay) {
+        fpsDisplay.innerHTML = `FPS: ${fps}`;
+    }
 }
 
 function sendTextToHTML(text, htmlID) {

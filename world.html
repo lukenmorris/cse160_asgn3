@@ -14,6 +14,24 @@
             flex-direction: column;
             align-items: center;
         }
+
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
         
         #webgl {
             border: 2px solid #666;
@@ -35,6 +53,8 @@
             background-color: rgba(0, 0, 0, 0.5);
             padding: 10px;
             border-radius: 5px;
+            z-index: 2000; /* Ensure it's above everything */
+            pointer-events: none; /* Allow clicking through */
         }
         
         #instructions {
@@ -45,9 +65,11 @@
             max-width: 600px;
         }
         
-        .fps {
+        #numdot {
             color: #0f0;
             font-family: monospace;
+            font-size: 16px;
+            text-shadow: 1px 1px 2px black;
         }
 
         #crosshair {
@@ -68,17 +90,17 @@
 <body onload="main()">
     <!-- Performance info -->
     <div id="hud">
-        <span class="fps" id="numdot">FPS: --</span>
+        <span id="numdot">FPS: --</span>
     </div>
 
-<div style="position: relative;">
-    <!-- WebGL Canvas -->
-    <canvas id="webgl" width="800" height="600">
-        Please use a browser that supports WebGL
-    </canvas>
-    <!-- Crosshair -->
-    <div id="crosshair">+</div>
-</div>
+    <div style="position: relative;">
+        <!-- WebGL Canvas -->
+        <canvas id="webgl" width="800" height="600">
+            Please use a browser that supports WebGL
+        </canvas>
+        <!-- Crosshair -->
+        <div id="crosshair">+</div>
+    </div>
 
     <!-- Controls Section -->
     <div id="controls">
@@ -108,6 +130,7 @@
     <script src="lib/webgl-utils.js"></script>
 
     <!-- Include our implementation files -->
+    <script src="FPSCounter.js"></script>
     <script src="Camera.js"></script>
     <script src="Triangle.js"></script>
     <script src="Cube.js"></script>
