@@ -9,7 +9,7 @@ class BlockSystem {
         const rayOrigin = new Vector3(camera.eye.elements);
         const rayDirection = new Vector3();
         
-        // Get forward vector (direction player is looking)
+        // Get direction player is looking
         rayDirection.set(camera.at);
         rayDirection.sub(camera.eye);
         rayDirection.normalize();
@@ -31,7 +31,7 @@ class BlockSystem {
             // Check if coordinates are within map bounds
             if (mapX >= 0 && mapX < 32 && mapZ >= 0 && mapZ < 32 && mapY >= 0) {
                 // Check if we hit a block
-                if (this.worldMap[mapX][mapZ] > mapY) {
+                if (mapY < this.worldMap[mapX][mapZ]) {
                     return {
                         x: mapX,
                         y: mapY,
@@ -46,7 +46,7 @@ class BlockSystem {
     }
 
     getHitFace(hitPos, rayDir) {
-        // Convert world position to block-local position
+        // Convert to local block position
         const localX = hitPos.elements[0] - Math.floor(hitPos.elements[0]);
         const localY = hitPos.elements[1] - Math.floor(hitPos.elements[1]);
         const localZ = hitPos.elements[2] - Math.floor(hitPos.elements[2]);
@@ -59,7 +59,7 @@ class BlockSystem {
         if (localZ < 0.01 && rayDir.elements[2] > 0) return 'front';
         if (localZ > 0.99 && rayDir.elements[2] < 0) return 'back';
         
-        return 'top'; // Default to top if uncertain
+        return 'top';
     }
 
     addBlock(camera) {
@@ -82,8 +82,7 @@ class BlockSystem {
 
         // Check if new position is valid
         if (newX >= 0 && newX < 32 && newZ >= 0 && newZ < 32 && newY >= 0) {
-            // Update map height if placing block higher than current height
-            if (newY >= this.worldMap[newX][newZ]) {
+            if (newY > this.worldMap[newX][newZ] - 1) {
                 this.worldMap[newX][newZ] = newY + 1;
                 return true;
             }
@@ -95,45 +94,15 @@ class BlockSystem {
         const hit = this.raycast(camera);
         if (!hit) return false;
 
-        // Don't allow removing bottom layer
-        if (hit.y === 0) return false;
+        // Don't allow removing bottom layer or blocks below terrain
+        if (hit.y <= 0 || hit.y < g_heightMap[hit.x][hit.z]) return false;
 
-        // Update map height if removing top block
+        // Only remove if it's the top block
         if (hit.y === this.worldMap[hit.x][hit.z] - 1) {
             this.worldMap[hit.x][hit.z]--;
             return true;
         }
 
         return false;
-    }
-
-    updateSelectedBlock(camera) {
-        this.selectedBlock = this.raycast(camera);
-    }
-
-    renderSelectedBlock(gl, a_Position, u_FragColor, u_ModelMatrix) {
-        if (!this.selectedBlock) return;
-
-        // Save current depth test state
-        const depthTest = gl.isEnabled(gl.DEPTH_TEST);
-        gl.disable(gl.DEPTH_TEST);
-
-        // Draw wireframe cube at selected block
-        const wireframe = new Cube();
-        wireframe.color = [1.0, 1.0, 1.0, 0.5]; // White, semi-transparent
-        wireframe.matrix.translate(
-            this.selectedBlock.x - 16,
-            this.selectedBlock.y,
-            this.selectedBlock.z - 16
-        );
-        wireframe.matrix.scale(1.001, 1.001, 1.001); // Slightly larger than block
-        
-        // Draw wireframe
-        gl.uniform4fv(u_FragColor, wireframe.color);
-        gl.uniformMatrix4fv(u_ModelMatrix, false, wireframe.matrix.elements);
-        gl.drawArrays(gl.LINES, 0, 24); // Draw cube edges only
-
-        // Restore depth test state
-        if (depthTest) gl.enable(gl.DEPTH_TEST);
     }
 }

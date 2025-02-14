@@ -49,6 +49,19 @@
             color: #0f0;
             font-family: monospace;
         }
+
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            user-select: none;
+            pointer-events: none;
+            text-shadow: 1px 1px 2px black;
+            z-index: 1000;  /* Make sure it's on top */
+        }
     </style>
 </head>
 
@@ -58,10 +71,14 @@
         <span class="fps" id="numdot">FPS: --</span>
     </div>
 
+<div style="position: relative;">
     <!-- WebGL Canvas -->
     <canvas id="webgl" width="800" height="600">
         Please use a browser that supports WebGL
     </canvas>
+    <!-- Crosshair -->
+    <div id="crosshair">+</div>
+</div>
 
     <!-- Controls Section -->
     <div id="controls">
@@ -97,6 +114,7 @@
     <script src="World.js"></script>
     <script src="perlin.js"></script>
     <script src="TreeSystem.js"></script>
+    <script src="BlockSystem.js"></script>
 
     <script>
         // Prevent right-click context menu

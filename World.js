@@ -62,6 +62,7 @@ let g_mouseDown = false;
 let g_lastMouseX = 0;
 let g_lastMouseY = 0;
 
+let g_blockSystem;
 let g_treeSystem;
 
 let g_dirtVertexBuffer, g_dirtUVBuffer, g_grassVertexBuffer, g_grassUVBuffer;
@@ -89,33 +90,40 @@ function setupBuffers() {
     gl.bufferData(gl.ARRAY_BUFFER, g_grassUVs, gl.STATIC_DRAW);
 }
 
+// Add to global variables
+let g_heightMap;  // Store original Perlin heights
+
 function initializeMap() {
     console.log('Initializing world with Perlin noise...');
     noise.seed(Math.random());
     let noiseScale = 0.1;
     g_map = new Array(32);
+    g_heightMap = new Array(32);  // Store original heights
 
+    // First pass: generate heights
+    for (let x = 0; x < 32; x++) {
+        g_map[x] = new Array(32);
+        g_heightMap[x] = new Array(32);
+        for (let z = 0; z < 32; z++) {
+            let height = Math.floor(3 * noise.simplex2(x * noiseScale, z * noiseScale)) + 2;
+            height = Math.max(1, Math.min(height, 4));
+            g_map[x][z] = height;
+            g_heightMap[x][z] = height;  // Store original height
+        }
+    }
+
+    updateWorldGeometry();
+}
+
+// New function to update geometry
+function updateWorldGeometry() {
     // Arrays to collect geometry data
     let dirtVertices = [];
     let dirtUVs = [];
     let grassVertices = [];
     let grassUVs = [];
 
-    // Track minimum height to determine base layer
-    let minHeight = Infinity;
-    
-    // First pass: determine minimum height
-    for (let x = 0; x < 32; x++) {
-        g_map[x] = new Array(32);
-        for (let z = 0; z < 32; z++) {
-            let height = Math.floor(3 * noise.simplex2(x * noiseScale, z * noiseScale)) + 2;
-            height = Math.max(1, Math.min(height, 4));
-            g_map[x][z] = height;
-            minHeight = Math.min(minHeight, height);
-        }
-    }
-
-    // Second pass: generate geometry with proper textures
+    // Generate geometry based on current g_map
     for (let x = 0; x < 32; x++) {
         for (let z = 0; z < 32; z++) {
             let height = g_map[x][z];
@@ -159,12 +167,6 @@ function initializeMap() {
     g_dirtUVs = new Float32Array(dirtUVs);
     g_grassVertices = new Float32Array(grassVertices);
     g_grassUVs = new Float32Array(grassUVs);
-    
-    console.log('World buffers prepared', {
-        dirtVertices: dirtVertices.length/3,
-        grassVertices: grassVertices.length/3,
-        minHeight: minHeight
-    });
 }
 
 
@@ -419,6 +421,7 @@ function tick() {
 function initMouseControls() {
     const canvas = document.getElementById('webgl');
     
+    // Request pointer lock when canvas is clicked
     canvas.addEventListener('click', () => {
         canvas.requestPointerLock();
     });
@@ -432,15 +435,17 @@ function initMouseControls() {
         }
     });
 
-    // Setup block manipulation handlers
+    // Handle block manipulation
     canvas.addEventListener('mousedown', (ev) => {
         if (document.pointerLockElement === canvas) {
             if (ev.button === 0) { // Left click
                 if (g_blockSystem.addBlock(g_camera)) {
+                    updateWorldGeometry(); // Update only the geometry
                     setupBuffers();
                 }
             } else if (ev.button === 2) { // Right click
                 if (g_blockSystem.removeBlock(g_camera)) {
+                    updateWorldGeometry(); // Update only the geometry
                     setupBuffers();
                 }
             }
@@ -460,6 +465,7 @@ function main() {
     g_treeSystem.generateTrees(g_map);
     g_treeSystem.setupBuffers(gl);
     
+    g_blockSystem = new BlockSystem(g_map);  // Initialize block system
     g_camera = new Camera();
 
     initMouseControls(); // Initialize mouse controls
