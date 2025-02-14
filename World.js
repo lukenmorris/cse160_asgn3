@@ -21,6 +21,8 @@ var FSHADER_SOURCE = `
     uniform sampler2D u_Sampler0;
     uniform sampler2D u_Sampler1;
     uniform sampler2D u_Sampler2;
+    uniform sampler2D u_Sampler3;
+    uniform sampler2D u_Sampler4;
     uniform int u_whichTexture;
     void main() {
         if (u_whichTexture == -2) {
@@ -31,6 +33,10 @@ var FSHADER_SOURCE = `
             gl_FragColor = texture2D(u_Sampler1, v_UV); // Dirt
         } else if (u_whichTexture == 2) {
             gl_FragColor = texture2D(u_Sampler2, v_UV); // Grass
+        } else if (u_whichTexture == 3) {
+            gl_FragColor = texture2D(u_Sampler3, v_UV); // Wood
+        } else if (u_whichTexture == 4) {
+            gl_FragColor = texture2D(u_Sampler4, v_UV); // Leaves
         } else {
             gl_FragColor = vec4(1, 1, 1, 1);
         }
@@ -51,6 +57,12 @@ let u_Sampler1;
 let u_Sampler2;
 let u_whichTexture;
 let g_camera;
+
+let g_mouseDown = false;
+let g_lastMouseX = 0;
+let g_lastMouseY = 0;
+
+let g_treeSystem;
 
 let g_dirtVertexBuffer, g_dirtUVBuffer, g_grassVertexBuffer, g_grassUVBuffer;
 let g_dirtVertices, g_dirtUVs, g_grassVertices, g_grassUVs;
@@ -198,6 +210,8 @@ function connectVariablesToGLSL() {
     u_Sampler0 = gl.getUniformLocation(gl.program, 'u_Sampler0');
     u_Sampler1 = gl.getUniformLocation(gl.program, 'u_Sampler1');
     u_Sampler2 = gl.getUniformLocation(gl.program, 'u_Sampler2');
+    u_Sampler3 = gl.getUniformLocation(gl.program, 'u_Sampler3');
+    u_Sampler4 = gl.getUniformLocation(gl.program, 'u_Sampler4');
     u_whichTexture = gl.getUniformLocation(gl.program, 'u_whichTexture');
 
     // Check for errors
@@ -245,6 +259,21 @@ function initTextures() {
         console.error('Failed to load grass texture');
     };
     grassImage.src = 'grass.png';
+
+        // Add to initTextures()
+    let woodImage = new Image();
+    woodImage.onload = function() {
+        console.log('Wood texture loaded successfully');
+        sendImageToTexture(woodImage, 3);
+    };
+    woodImage.src = 'wood.jpg';
+
+    let leavesImage = new Image();
+    leavesImage.onload = function() {
+        console.log('leaves texture loaded successfully');
+        sendImageToTexture(leavesImage, 4);
+    };
+    leavesImage.src = 'leaf.png';
 }
 
 function sendImageToTexture(image, texNum) {
@@ -376,6 +405,8 @@ function renderAllShapes() {
     // Draw all blocks
     drawMap();
 
+    g_treeSystem.render(gl, a_Position, a_UV, u_whichTexture);
+
     let duration = performance.now() - startTime;
     console.log(`Render cycle completed in ${duration}ms`);
 }
@@ -385,17 +416,14 @@ function tick() {
     requestAnimationFrame(tick);
 }
 
-function main() {
-    setupWebGL();
-    connectVariablesToGLSL();
-    initTextures();
-    initializeMap();    // Must come before setupBuffers
-    setupBuffers();     // New buffer initialization
-    
-    g_camera = new Camera();
-
+function initMouseControls() {
     const canvas = document.getElementById('webgl');
-
+    
+    canvas.addEventListener('click', () => {
+        canvas.requestPointerLock();
+    });
+    
+    // Setup pointer lock change handler
     document.addEventListener('pointerlockchange', () => {
         if (document.pointerLockElement === canvas) {
             document.addEventListener('mousemove', onMouseMove);
@@ -403,6 +431,38 @@ function main() {
             document.removeEventListener('mousemove', onMouseMove);
         }
     });
+
+    // Setup block manipulation handlers
+    canvas.addEventListener('mousedown', (ev) => {
+        if (document.pointerLockElement === canvas) {
+            if (ev.button === 0) { // Left click
+                if (g_blockSystem.addBlock(g_camera)) {
+                    setupBuffers();
+                }
+            } else if (ev.button === 2) { // Right click
+                if (g_blockSystem.removeBlock(g_camera)) {
+                    setupBuffers();
+                }
+            }
+            renderAllShapes();
+        }
+    });
+}
+
+function main() {
+    setupWebGL();
+    connectVariablesToGLSL();
+    initTextures();
+    initializeMap();    // Must come before setupBuffers
+    setupBuffers();     // New buffer initialization
+
+    g_treeSystem = new TreeSystem();
+    g_treeSystem.generateTrees(g_map);
+    g_treeSystem.setupBuffers(gl);
+    
+    g_camera = new Camera();
+
+    initMouseControls(); // Initialize mouse controls
     document.onkeydown = keydown;
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     requestAnimationFrame(tick);

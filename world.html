@@ -96,18 +96,12 @@
     <script src="Cube.js"></script>
     <script src="World.js"></script>
     <script src="perlin.js"></script>
+    <script src="TreeSystem.js"></script>
 
     <script>
         // Prevent right-click context menu
         document.addEventListener('contextmenu', event => event.preventDefault());
-
-        // Lock pointer when clicking canvas
-        const webglCanvas = document.getElementById('webgl');
-        webglCanvas.addEventListener('click', function() {
-            webglCanvas.requestPointerLock = webglCanvas.requestPointerLock ||
-                                           webglCanvas.mozRequestPointerLock;
-            webglCanvas.requestPointerLock();
-        });
     </script>
+
 </body>
 </html>
