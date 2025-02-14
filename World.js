@@ -52,39 +52,91 @@ let u_Sampler2;
 let u_whichTexture;
 let g_camera;
 
-// World map initialization
-let g_map = [];
+let g_dirtVertexBuffer, g_dirtUVBuffer, g_grassVertexBuffer, g_grassUVBuffer;
+let g_dirtVertices, g_dirtUVs, g_grassVertices, g_grassUVs;
+
+function setupBuffers() {
+    console.log('Setting up WebGL buffers...');
+    
+    // Dirt buffers
+    g_dirtVertexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, g_dirtVertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, g_dirtVertices, gl.STATIC_DRAW);
+
+    g_dirtUVBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, g_dirtUVBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, g_dirtUVs, gl.STATIC_DRAW);
+
+    // Grass buffers
+    g_grassVertexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, g_grassVertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, g_grassVertices, gl.STATIC_DRAW);
+
+    g_grassUVBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, g_grassUVBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, g_grassUVs, gl.STATIC_DRAW);
+}
 
 function initializeMap() {
-    console.log('Initializing map...');
-    // First create the array structure
-    for(let i = 0; i < 32; i++) {
-        g_map[i] = new Array(32).fill(0);
-    }
-    
-    // Add terrain features
-    for(let x = 0; x < 32; x++) {
-        for(let z = 0; z < 32; z++) {
-            // Create border walls
-            if(x === 0 || x === 31 || z === 0 || z === 31) {
-                g_map[x][z] = 2; // Border walls are 2 blocks high
-                console.log(`Added border wall at (${x}, ${z})`);
-            }
-            // Add some random terrain blocks
-            else if(Math.random() < 0.1) {
-                g_map[x][z] = Math.floor(Math.random() * 2) + 1;
-                console.log(`Added terrain block at (${x}, ${z}) with height ${g_map[x][z]}`);
+    console.log('Initializing world with Perlin noise...');
+    noise.seed(Math.random());
+    let noiseScale = 0.1;
+    g_map = new Array(32);
+
+    // Arrays to collect geometry data
+    let dirtVertices = [];
+    let dirtUVs = [];
+    let grassVertices = [];
+    let grassUVs = [];
+
+    for (let x = 0; x < 32; x++) {
+        g_map[x] = new Array(32);
+        for (let z = 0; z < 32; z++) {
+            let height = Math.floor(3 * noise.simplex2(x * noiseScale, z * noiseScale)) + 2;
+            height = Math.max(1, Math.min(height, 4));
+            g_map[x][z] = height;
+
+            for (let y = 0; y < height; y++) {
+                const isTop = y === height - 1;
+                const tx = x - 16;
+                const ty = y - 0.5;
+                const tz = z - 16;
+
+                // Get cube geometry
+                const cube = new Cube();
+                const verts = cube.vertices;
+                const uvs = cube.uvCoords;
+
+                // Process vertices
+                for (let i = 0; i < verts.length; i += 3) {
+                    const xPos = verts[i] + tx;
+                    const yPos = verts[i+1] + ty;
+                    const zPos = verts[i+2] + tz;
+                    if (isTop) {
+                        grassVertices.push(xPos, yPos, zPos);
+                    } else {
+                        dirtVertices.push(xPos, yPos, zPos);
+                    }
+                }
+
+                // Process UVs
+                if (isTop) {
+                    grassUVs.push(...uvs);
+                } else {
+                    dirtUVs.push(...uvs);
+                }
             }
         }
     }
-    
-    // Add some test blocks near spawn
-    g_map[16][16] = 1;  // Center block
-    g_map[15][15] = 2;  // Nearby blocks
-    g_map[17][17] = 2;
-    
-    console.log('Map initialization complete');
+
+    // Convert to Float32Arrays
+    g_dirtVertices = new Float32Array(dirtVertices);
+    g_dirtUVs = new Float32Array(dirtUVs);
+    g_grassVertices = new Float32Array(grassVertices);
+    g_grassUVs = new Float32Array(grassUVs);
+    console.log('World buffers prepared');
 }
+
 
 function setupWebGL() {
     console.log('Setting up WebGL...');
@@ -195,21 +247,44 @@ function sendImageToTexture(image, texNum) {
 }
 
 function drawMap() {
-    console.log('Drawing map...');
-    for(let x = 0; x < 32; x++) {
-        for(let z = 0; z < 32; z++) {
-            let height = g_map[x][z];
-            if(height > 0) {
-                console.log(`Drawing block at (${x}, ${z}) with height ${height}`);
-                for(let y = 0; y < height; y++) {
-                    let cube = new Cube();
-                    cube.textureNum = (y === height-1) ? 2 : 1; // Top block uses grass, others use dirt
-                    cube.matrix.translate(x-16, y-0.5, z-16);
-                    cube.render();
-                }
-            }
-        }
-    }
+    // Use identity matrix for pre-transformed geometry
+    const identityMat = new Matrix4();
+    gl.uniformMatrix4fv(u_ModelMatrix, false, identityMat.elements);
+
+    // Draw dirt cubes
+    gl.uniform1i(u_whichTexture, 1);
+    gl.bindBuffer(gl.ARRAY_BUFFER, g_dirtVertexBuffer);
+    gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, g_dirtUVBuffer);
+    gl.vertexAttribPointer(a_UV, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, g_dirtVertices.length/3);
+
+    // Draw grass cubes
+    gl.uniform1i(u_whichTexture, 2);
+    gl.bindBuffer(gl.ARRAY_BUFFER, g_grassVertexBuffer);
+    gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, g_grassUVBuffer);
+    gl.vertexAttribPointer(a_UV, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, g_grassVertices.length/3);
+}
+
+function drawSkybox() {
+    let sky = new Cube();
+    sky.textureNum = -2; // Use solid color
+    sky.color = [0.53, 0.81, 0.98, 1.0]; // Light sky blue
+    
+    // Position skybox at camera position
+    sky.matrix.translate(
+        g_camera.eye.elements[0],
+        g_camera.eye.elements[1],
+        g_camera.eye.elements[2]
+    );
+    sky.matrix.scale(100, 100, 100);
+    
+    // Disable depth testing for sky
+    gl.disable(gl.DEPTH_TEST);
+    sky.render();
+    gl.enable(gl.DEPTH_TEST);
 }
 
 function keydown(ev) {
@@ -272,23 +347,7 @@ function renderAllShapes() {
     let globalRotMat = new Matrix4();
     gl.uniformMatrix4fv(u_GlobalRotateMatrix, false, globalRotMat.elements);
 
-    // Draw sky box
-    console.log('Drawing sky box...');
-    let sky = new Cube();
-    sky.color = [0.6, 0.8, 1.0, 1.0];  // Light blue color
-    sky.textureNum = -2;  // Use solid color instead of texture
-    sky.matrix.scale(100, 100, 100);
-    sky.matrix.translate(-0.5, -0.5, -0.5);
-    sky.render();
-
-    // Draw ground plane
-    console.log('Drawing ground plane...');
-    let ground = new Cube();
-    ground.textureNum = 1;
-    ground.matrix.translate(0, -1, 0);
-    ground.matrix.scale(32, 0.1, 32);
-    ground.matrix.translate(-0.5, 0, -0.5);
-    ground.render();
+    drawSkybox();
 
     // Draw all blocks
     drawMap();
@@ -303,28 +362,16 @@ function tick() {
 }
 
 function main() {
-    console.log('Starting main...');
     setupWebGL();
     connectVariablesToGLSL();
     initTextures();
+    initializeMap();    // Must come before setupBuffers
+    setupBuffers();     // New buffer initialization
+    setupMouseControls(); // Add this line
     
-    // Initialize map and camera
-    console.log('Initializing game world...');
-    initializeMap();
-    
-    console.log('Initializing camera...');
     g_camera = new Camera();
-    console.log('Camera initialized:', g_camera);
-
-    // Set up event listeners
     document.onkeydown = keydown;
-    
-    // Set initial clear color
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
-    console.log('Main initialization complete, starting render loop');
-    
-    // Initial render
-    renderAllShapes();
     requestAnimationFrame(tick);
 }
 
