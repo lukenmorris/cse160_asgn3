@@ -89,15 +89,27 @@ function initializeMap() {
     let grassVertices = [];
     let grassUVs = [];
 
+    // Track minimum height to determine base layer
+    let minHeight = Infinity;
+    
+    // First pass: determine minimum height
     for (let x = 0; x < 32; x++) {
         g_map[x] = new Array(32);
         for (let z = 0; z < 32; z++) {
             let height = Math.floor(3 * noise.simplex2(x * noiseScale, z * noiseScale)) + 2;
             height = Math.max(1, Math.min(height, 4));
             g_map[x][z] = height;
+            minHeight = Math.min(minHeight, height);
+        }
+    }
+
+    // Second pass: generate geometry with proper textures
+    for (let x = 0; x < 32; x++) {
+        for (let z = 0; z < 32; z++) {
+            let height = g_map[x][z];
 
             for (let y = 0; y < height; y++) {
-                const isTop = y === height - 1;
+                const isBaseLayer = (y === 0);  // Bottom layer is always grass
                 const tx = x - 16;
                 const ty = y - 0.5;
                 const tz = z - 16;
@@ -112,7 +124,8 @@ function initializeMap() {
                     const xPos = verts[i] + tx;
                     const yPos = verts[i+1] + ty;
                     const zPos = verts[i+2] + tz;
-                    if (isTop) {
+                    
+                    if (isBaseLayer) {
                         grassVertices.push(xPos, yPos, zPos);
                     } else {
                         dirtVertices.push(xPos, yPos, zPos);
@@ -120,7 +133,7 @@ function initializeMap() {
                 }
 
                 // Process UVs
-                if (isTop) {
+                if (isBaseLayer) {
                     grassUVs.push(...uvs);
                 } else {
                     dirtUVs.push(...uvs);
@@ -134,7 +147,12 @@ function initializeMap() {
     g_dirtUVs = new Float32Array(dirtUVs);
     g_grassVertices = new Float32Array(grassVertices);
     g_grassUVs = new Float32Array(grassUVs);
-    console.log('World buffers prepared');
+    
+    console.log('World buffers prepared', {
+        dirtVertices: dirtVertices.length/3,
+        grassVertices: grassVertices.length/3,
+        minHeight: minHeight
+    });
 }
 
 
@@ -318,6 +336,12 @@ function keydown(ev) {
     renderAllShapes();
 }
 
+function onMouseMove(e) {
+    if (!document.pointerLockElement) return;
+    g_camera.lookAround(e.movementX, e.movementY);
+    renderAllShapes();
+}
+
 function renderAllShapes() {
     let startTime = performance.now();
     console.log('Starting render cycle...');
@@ -367,9 +391,18 @@ function main() {
     initTextures();
     initializeMap();    // Must come before setupBuffers
     setupBuffers();     // New buffer initialization
-    setupMouseControls(); // Add this line
     
     g_camera = new Camera();
+
+    const canvas = document.getElementById('webgl');
+
+    document.addEventListener('pointerlockchange', () => {
+        if (document.pointerLockElement === canvas) {
+            document.addEventListener('mousemove', onMouseMove);
+        } else {
+            document.removeEventListener('mousemove', onMouseMove);
+        }
+    });
     document.onkeydown = keydown;
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     requestAnimationFrame(tick);
