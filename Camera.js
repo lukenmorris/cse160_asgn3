@@ -3,7 +3,7 @@ class Camera {
         // Movement settings
         this.moveSpeed = 0.2;
         this.turnSpeed = 3;
-        this.collisionRadius = 0.2;
+        this.collisionRadius = 0.15;
         this.height = 1.8;
 
         // Initialize vectors (will be set properly in findSafeSpawn)
@@ -93,6 +93,26 @@ class Camera {
         
         // Check if there's enough headroom
         const headY = groundY + this.height;
+
+        // Check for trees in a 3x3 area around spawn point
+        if (g_treeSystem && g_treeSystem.treeLocations) {
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dz = -1; dz <= 1; dz++) {
+                    const checkX = mapX + dx;
+                    const checkZ = mapZ + dz;
+                    
+                    // Check if there's a tree at this location
+                    const tree = g_treeSystem.treeLocations.find(t => 
+                        t.x === checkX && t.z === checkZ
+                    );
+                    
+                    if (tree) {
+                        // If there's a tree nearby, this isn't a safe spawn
+                        return false;
+                    }
+                }
+            }
+        }
         
         // Check if position is safe (no blocks at head level)
         return !this.checkCollision(new Vector3([worldX, headY, worldZ]));
@@ -104,65 +124,112 @@ class Camera {
     }
 
     checkCollision(position) {
-        // Convert world coordinates to map coordinates
-        const mapX = Math.floor(position.elements[0] + 16);
-        const mapY = Math.floor(position.elements[1] + 0.5);
-        const mapZ = Math.floor(position.elements[2] + 16);
+        const margin = 0.2;
+        const verticalMargin = 0.3;
+        const checkPoints = [
+            [0, 0, 0],
+            [margin, -verticalMargin, margin],
+            [margin, -verticalMargin, -margin],
+            [-margin, -verticalMargin, margin],
+            [-margin, -verticalMargin, -margin],
+            [margin, verticalMargin, margin],
+            [margin, verticalMargin, -margin],
+            [-margin, verticalMargin, margin],
+            [-margin, verticalMargin, -margin],
+            [margin, 0, 0],
+            [-margin, 0, 0],
+            [0, verticalMargin, 0],
+            [0, -verticalMargin, 0],
+            [0, 0, margin],
+            [0, 0, -margin]
+        ];
 
-        // Check if coordinates are within map bounds
-        if (mapX < 0 || mapX >= 32 || mapZ < 0 || mapZ >= 32 || mapY < 0) {
-            return true; // Collide with world boundaries
-        }
+        for (let point of checkPoints) {
+            const checkPos = new Vector3([
+                position.elements[0] + point[0],
+                position.elements[1] + point[1],
+                position.elements[2] + point[2]
+            ]);
 
-        // Check if there's a block at this position
-        if (g_map[mapX] && g_map[mapX][mapZ] > mapY) {
-            return true;
+            // Convert to map coordinates
+            const mapX = Math.floor(checkPos.elements[0] + 16);
+            const mapY = Math.floor(checkPos.elements[1] + 0.5);
+            const mapZ = Math.floor(checkPos.elements[2] + 16);
+
+            // Check map bounds
+            if (mapX < 0 || mapX >= 32 || mapZ < 0 || mapZ >= 32) {
+                return true;
+            }
+
+            // Check terrain collision
+            if (mapY >= 0 && g_map[mapX] && g_map[mapX][mapZ] > mapY) {
+                return true;
+            }
+
+            // Check tree collision
+            if (g_treeSystem && g_treeSystem.treeLocations) {
+                for (let tree of g_treeSystem.treeLocations) {
+                    // Check if we're within the tree's trunk bounds
+                    if (mapX === tree.x && mapZ === tree.z) {
+                        // Only collide with trunk, not leaves
+                        const trunkTop = tree.y + tree.trunkHeight;
+                        if (mapY >= tree.y && mapY < trunkTop) {
+                            // Additional check for trunk hitbox
+                            const trunkMargin = 0.3;
+                            const trunkX = tree.x - 16 + 0.5; // Center of trunk
+                            const trunkZ = tree.z - 16 + 0.5;
+                            const dx = Math.abs(checkPos.elements[0] - trunkX);
+                            const dz = Math.abs(checkPos.elements[2] - trunkZ);
+                            
+                            if (dx < trunkMargin && dz < trunkMargin) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         return false;
     }
 
-    // Rest of the Camera class methods remain the same...
     canMoveTo(newPosition) {
-        const angles = [0, 45, 90, 135, 180, 225, 270, 315];
-        const footPosition = new Vector3([
-            newPosition.elements[0],
-            newPosition.elements[1] - this.height/2,
-            newPosition.elements[2]
-        ]);
-        const headPosition = new Vector3([
-            newPosition.elements[0],
-            newPosition.elements[1] + this.height/2,
-            newPosition.elements[2]
-        ]);
+        let adjustedPosition = new Vector3(newPosition.elements);
+        
+        const currentX = Math.floor(this.eye.elements[0] + 16);
+        const currentZ = Math.floor(this.eye.elements[2] + 16);
+        const targetX = Math.floor(adjustedPosition.elements[0] + 16);
+        const targetZ = Math.floor(adjustedPosition.elements[2] + 16);
 
-        if (this.checkCollision(footPosition) || this.checkCollision(headPosition)) {
-            return false;
-        }
-
-        for (let angle of angles) {
-            const radians = angle * Math.PI / 180;
-            const offsetX = this.collisionRadius * Math.cos(radians);
-            const offsetZ = this.collisionRadius * Math.sin(radians);
-
-            const footCheck = new Vector3([
-                footPosition.elements[0] + offsetX,
-                footPosition.elements[1],
-                footPosition.elements[2] + offsetZ
-            ]);
-
-            const headCheck = new Vector3([
-                headPosition.elements[0] + offsetX,
-                headPosition.elements[1],
-                headPosition.elements[2] + offsetZ
-            ]);
-
-            if (this.checkCollision(footCheck) || this.checkCollision(headCheck)) {
-                return false;
+        // Height adjustment for terrain
+        if (currentX !== targetX || currentZ !== targetZ) {
+            if (targetX >= 0 && targetX < 32 && targetZ >= 0 && targetZ < 32) {
+                const currentHeight = g_map[currentX][currentZ];
+                const targetHeight = g_map[targetX][targetZ];
+                
+                // Check for tree trunks in the path
+                let treeHeight = 0;
+                if (g_treeSystem && g_treeSystem.trees) {
+                    const tree = g_treeSystem.trees.find(t => t.x === targetX && t.z === targetZ);
+                    if (tree) {
+                        treeHeight = tree.y + tree.trunkHeight;
+                    }
+                }
+                
+                // Use the higher of terrain or tree height for adjustment
+                const effectiveTargetHeight = Math.max(targetHeight, treeHeight);
+                if (effectiveTargetHeight > currentHeight) {
+                    adjustedPosition.elements[1] += 0.2 * (effectiveTargetHeight - currentHeight);
+                }
             }
         }
 
-        return true;
+        if (!this.checkCollision(adjustedPosition)) {
+            newPosition.elements[1] = adjustedPosition.elements[1];
+            return true;
+        }
+
+        return false;
     }
 
     moveForward() {
